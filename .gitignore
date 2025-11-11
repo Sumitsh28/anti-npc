@@ -1,0 +1,9 @@
+venv
+.env
+__pycache__/
+*.pyc
+.DS_Store
+instance/
+.idea/
+.vscode/
+anti-npc.2025-11-11.private-key.pem
