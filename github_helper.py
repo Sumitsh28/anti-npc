@@ -70,13 +70,18 @@ def get_github_client(installation_id):
 
 
 def get_issue_data(client, repo_full_name, issue_number):
-    """Fetches the issue title and body."""
+    """Fetches the issue title, body, and labels."""
     try:
         repo = client.get_repo(repo_full_name)
         issue = repo.get_issue(number=issue_number)
+        
+        # --- NEW: Get label names ---
+        labels = [label.name for label in issue.labels]
+        
         return {
             "title": issue.title,
-            "body": issue.body or ""
+            "body": issue.body or "",
+            "labels": labels  
         }
     except Exception as e:
         print(f"Error fetching issue data: {e}")
@@ -103,8 +108,8 @@ def get_repo_data(client, repo_full_name):
 
 def get_user_data(client, username, repo_full_name):
     """
-    Fetches user's profile info, recent public activity (PRs),
-    specific contributions to the target repo, and languages of owned repos.
+    Fetches user's profile info, activity, and
+    the code diffs of their last 3 merged PRs in the target repo.
     """
     try:
         user = client.get_user(username)
@@ -123,14 +128,33 @@ def get_user_data(client, username, repo_full_name):
                     pr_details.append(f"PR to {pr_repo}: {pr_title}")
         
         repo_contribution_count = 0
+        
+        pr_diffs = []
         try:
             query = f"is:pr is:merged author:{username} repo:{repo_full_name}"
-            search_results = client.search_issues(query)
+            search_results = client.search_issues(query, sort='created', order='desc')
+            
             repo_contribution_count = search_results.totalCount
             print(f"Found {repo_contribution_count} merged PRs for {username} in {repo_full_name}")
+            
+            token = client.auth.token
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github.v3.diff", 
+            }
+            
+            for issue in search_results[:3]:
+                pr = issue.as_pull_request()
+                diff_url = pr.diff_url
+                
+                diff_response = requests.get(diff_url, headers=headers)
+                diff_response.raise_for_status()
+                
+                pr_diffs.append(diff_response.text[:4000])
+
         except Exception as e:
-            print(f"Error searching for repo-specific PRs: {e}")
-            repo_contribution_count = 0
+            print(f"Error searching or fetching PR diffs: {e}")
+
             
         repo_languages = set()
         try:
@@ -147,7 +171,8 @@ def get_user_data(client, username, repo_full_name):
             "bio": bio,
             "recent_prs": "\n".join(pr_details),
             "repo_contribution_count": repo_contribution_count,
-            "repo_languages": list(repo_languages) 
+            "repo_languages": list(repo_languages),
+            "pr_diffs": pr_diffs
         }
     except Exception as e:
         print(f"Error fetching user data for {username}: {e}")

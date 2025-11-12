@@ -1,11 +1,6 @@
-def calculate_score(issue_tech_stack, user_analysis, user_github_data, repo_full_name):
+def calculate_score(issue_tech_stack, user_analysis, user_github_data, contribution_analysis, repo_full_name):
     """
-    Calculates a score out of 10 based on the defined criteria.
-    
-    issue_tech_stack: {"tech_stack": ["python", "flask"]}
-    user_analysis: {"user_skills": ["python"], "explanation_quality": 5, "explanation_summary": "..."}
-    user_github_data: PyGithub User object (or similar dict). We'll fake this for now.
-    repo_full_name: "owner/repo"
+    Calculates a score and generates a dynamic, actionable report.
     """
     
     scores = {
@@ -27,7 +22,8 @@ def calculate_score(issue_tech_stack, user_analysis, user_github_data, repo_full
             scores["tech_match"]["details"] = f"Found {len(matches)} matching skills: {', '.join(matches)}"
         else:
             scores["tech_match"]["score"] = 0
-            scores["tech_match"]["details"] = f"No skills match required stack: {', '.join(stack)}"
+            stack_str = ", ".join(stack) if stack else "N/A"
+            scores["tech_match"]["details"] = f"No skills match required stack: {stack_str}"
 
  
     exp_quality = user_analysis.get('explanation_quality', 0)
@@ -36,11 +32,22 @@ def calculate_score(issue_tech_stack, user_analysis, user_github_data, repo_full
 
   
     contribution_count = user_github_data.get('repo_contribution_count', 0)
+    avg_complexity = contribution_analysis.get('average_complexity', 0)
     
     if contribution_count > 0:
-        score = 2 if contribution_count >= 3 else 1
+        if avg_complexity >= 9:
+            score = 2
+        elif avg_complexity >= 7:
+            score = 1.5
+        elif avg_complexity >= 4:
+            score = 1
+        elif avg_complexity > 0:
+            score = 0.5
+        else:
+            score = 0
+            
         scores["repo_contributions"]["score"] = score
-        scores["repo_contributions"]["details"] = f"User has {contribution_count} merged PR(s) in this repository."
+        scores["repo_contributions"]["details"] = contribution_analysis.get('summary', 'Analyzed past contributions.')
     else:
         scores["repo_contributions"]["score"] = 0 
         scores["repo_contributions"]["details"] = "No merged PRs found in this repository."
@@ -55,22 +62,68 @@ def calculate_score(issue_tech_stack, user_analysis, user_github_data, repo_full
         
     total_score = sum(s['score'] for s in scores.values())
     
+    
+    username = user_github_data.get('username', 'user')
+    required_skills = ", ".join(issue_tech_stack.get('tech_stack', ['N/A']))
+    explanation_score = scores["explanation"]["score"]
+    repo_score = scores["repo_contributions"]["score"]
+    tech_score = scores["tech_match"]["score"]
+    
+    feedback_summary = ""
+    
+    if total_score > 8.0:
+        feedback_summary = f"""
+### 🚀 Assessment: Excellent Match
+Hi @maintainer! This user looks like a **perfect fit** ({total_score:.1f}/10).
+Their profile shows a strong skill match and high-quality past contributions relevant to this repo.
+"""
+    elif total_score >= 4.0:
+        if tech_score < 1.0:
+            feedback_summary = f"""
+### ⚠️ Assessment: Potential Mismatch
+Hi @{username} ({total_score:.1f}/10). Thanks for your interest! This issue seems to require skills in **{required_skills}**, which don't appear in your recent public profile. 
+Could you clarify your experience with these technologies?
+"""
+        elif explanation_score < 1.0:
+            feedback_summary = f"""
+### 💡 Assessment: Good Profile, Needs Plan
+Hi @{username} ({total_score:.1f}/10). You have a relevant profile! However, your comment didn't include a plan.
+Could you briefly explain *how* you'd approach solving this issue?
+"""
+        else:
+            feedback_summary = f"""
+### 🤔 Assessment: Good Fit
+Hi @{username}. You look like a good fit for this issue ({total_score:.1f}/10). 
+@maintainer this user seems well-qualified.
+"""
+    else: 
+        if total_score < 2.0 and explanation_score == 0 and repo_score == 0:
+            feedback_summary = f"""
+### 🚩 Assessment: Low-Effort Request
+Hi @maintainer. **Warning:** This user's request ({total_score:.1f}/10) appears to be a low-effort comment.
+There is no plan, no matching skills, and no past contribution history in this repo.
+"""
+        else:
+            feedback_summary = f"""
+### 📉 Assessment: Not a Strong Match
+Hi @{username} ({total_score:.1f}/10). Thanks for your interest, but based on your public profile, this issue may not be the best fit.
+It requires skills in **{required_skills}**, and your profile doesn't show a strong match.
+"""
+
     report = f"""
-### 🤖 Bot Analysis for @{user_github_data.get('username', 'user')}
-
-Here's a quick assessment of this user's profile for this issue:
-
-**Final Score: {total_score:.1f} / 10**
+{feedback_summary}
 
 ---
 
-#### Score Breakdown
+### 🤖 Detailed Analysis for @{username}
+
+**Final Score: {total_score:.1f} / 10**
 
 | Category | Score | Max | Details |
 | :--- | :---: | :---: | :--- |
 | **Tech Stack Match** | {scores['tech_match']['score']} | {scores['tech_match']['max']} | {scores['tech_match']['details']} |
 | **Explanation Quality** | {scores['explanation']['score']} | {scores['explanation']['max']} | {scores['explanation']['details']} |
-| **Repo Contributions** | {scores['repo_contributions']['score']} | {scores['repo_contributions']['max']} | {scores['repo_contributions']['details']} |
+| **Repo Contribution Quality** | {scores['repo_contributions']['score']} | {scores['repo_contributions']['max']} | {scores['repo_contributions']['details']} |
 | **Other Contributions** | {scores['other_contributions']['score']} | {scores['other_contributions']['max']} | {scores['other_contributions']['details']} |
 
 ---
