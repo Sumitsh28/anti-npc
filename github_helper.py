@@ -12,13 +12,10 @@ def get_github_app_jwt():
     """
     app_id = os.environ.get('GITHUB_APP_ID')
     
-    private_key_path = os.environ.get('GITHUB_PRIVATE_KEY_PATH')
-    if not os.path.exists(private_key_path):
-        raise FileNotFoundError(f"Private key file not found at: {private_key_path}")
+    private_key = os.environ.get('GITHUB_PRIVATE_KEY')
+    if not private_key:
+        raise ValueError("GITHUB_PRIVATE_KEY environment variable is not set")
         
-    with open(private_key_path, 'r') as f:
-        private_key = f.read()
-
     payload = {
         'iat': int(time.time()), 
         'exp': int(time.time()) + (10 * 60), 

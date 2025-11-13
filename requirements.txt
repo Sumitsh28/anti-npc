@@ -5,3 +5,4 @@ requests
 PyGithub
 PyJWT 
 cachetools
+gunicorn
