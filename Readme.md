@@ -56,6 +56,13 @@ The entire process is event-driven, orchestrated by the Flask server.
 
 ---
 
+## 📸 Screenshot
+
+![alt text](https://raw.githubusercontent.com/Sumitsh28/images/710a851af43bb2b890834b27063e184a0b438048/before.png)
+![alt text](https://raw.githubusercontent.com/Sumitsh28/images/710a851af43bb2b890834b27063e184a0b438048/after.png)
+
+---
+
 ## 📚 Setup & Local Development
 
 Follow these steps to run the bot on your local machine for testing.
